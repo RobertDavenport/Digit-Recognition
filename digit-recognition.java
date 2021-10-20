@@ -4,8 +4,8 @@ import java.util.Arrays;
 /* Desc */
 class DigitRecognition
 {
-    // Might not even need this....
     public static int miniBatchSize = 2;
+    public static int eta = 10;
 
     // Input Layer
     public static double[][] activationLayer0 = 
@@ -95,7 +95,7 @@ class DigitRecognition
     public static double[][] calculateWeightGradient(double[] aLayer, double[] gradientBias)
     {
         double[][] weightGradient = new double[gradientBias.length][aLayer.length];
-        for (int i = 0; i< gradientBias.length; i++)
+        for (int i = 0; i < gradientBias.length; i++)
         {
             for (int j = 0; j < aLayer.length; j++)
             {
@@ -105,7 +105,43 @@ class DigitRecognition
         return weightGradient;
     }
 
-    //public static double[][] reviseWeights(double[][] weights)
+    public static double[] reviseBias(double[][] biasGradient, double[] startingBias)
+    {
+        double[] revisedBias = new double[startingBias.length];       
+
+        for (int i = 0; i < startingBias.length; i++)
+        {
+            double sumBiasGradient = 0;
+            for (int j = 0; j < biasGradient.length; j++)
+            {
+                sumBiasGradient += biasGradient[j][i]; 
+            }
+            revisedBias[i] = startingBias[i] - (eta/2) * sumBiasGradient;         
+        }
+        return revisedBias;
+    }
+
+    // Similar to reviseBias but altered to handle the 3D array used to store the weight gradients
+    public static double[][] reviseWeights(double[][][] weightGradient, double[][] startingWeights)
+    {
+        double[][] revisedWeights = new double[startingWeights.length][startingWeights[0].length];       
+
+        for (int i = 0; i < weightGradient[0][0].length; i++)
+        {          
+            for (int j = 0; j < weightGradient[0].length; j++)
+            {        
+                double sumWeightGradient = 0;
+                // Sums a weight from each calculated weight gradient from their 3D array position  
+                for (int k = 0; k < weightGradient.length; k++)
+                {
+                    sumWeightGradient += weightGradient[k][j][i]; 
+                }
+                // Once summation has been found from past weights, use formula
+                revisedWeights[j][i] = startingWeights[j][i] - (eta/2) * sumWeightGradient;         
+            }
+        }
+        return revisedWeights;
+    }
 
     public static void main(String args[])
     {
@@ -116,6 +152,7 @@ class DigitRecognition
         // 3D arrays for storing calculated bias for each run of a minibatch
         double[][] calculatedBiasesLayer1 = new double[miniBatchSize][biasLayer1.length];
         double[][] calculatedBiasesLayer2 = new double[miniBatchSize][biasLayer2.length];
+
         for (int i = 0; i < miniBatchSize; i++)
         {   
             System.out.println("---===Run " + (i + 1) + "/" + miniBatchSize +" For MiniBatch===--- \n");
@@ -157,5 +194,15 @@ class DigitRecognition
         System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
         System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1).replaceAll("], ", "],\n") + "\n");
         System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2).replaceAll("], ", "],\n") + "\n");
+
+        biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
+        biasLayer2 = reviseBias(calculatedBiasesLayer2, biasLayer2);
+        System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
+        System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
+
+        weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
+        weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
+        System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
+        System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
     }
 }
