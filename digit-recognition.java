@@ -43,6 +43,7 @@ class DigitRecognition
     public static int miniBatchSize = 2;
     public static int eta = 10;
     public static int miniBatchPerEpoch = (activationLayer0.length / miniBatchSize);
+    public static int totalEpochs = 6;
 
     // 3D arrays for storing calculated weights for each run of a minibatch
     public static double[][][] calculatedWeightsLayer1 = new double[miniBatchSize][weightLayer1.length][weightLayer1[0].length];
@@ -126,7 +127,7 @@ class DigitRecognition
             {
                 sumBiasGradient += biasGradient[j][i]; 
             }
-            revisedBias[i] = startingBias[i] - (eta/2) * sumBiasGradient;         
+            revisedBias[i] = startingBias[i] - (eta/miniBatchSize) * sumBiasGradient;         
         }
         return revisedBias;
     }
@@ -147,7 +148,7 @@ class DigitRecognition
                     sumWeightGradient += weightGradient[k][j][i]; 
                 }
                 // Once summation has been found from past weights, use formula
-                revisedWeights[j][i] = startingWeights[j][i] - (eta/2) * sumWeightGradient;         
+                revisedWeights[j][i] = startingWeights[j][i] - (eta/miniBatchSize) * sumWeightGradient;         
             }
         }
         return revisedWeights;
@@ -166,17 +167,17 @@ class DigitRecognition
             double[] aLayer2 = calculateALayer(zLayer2);
 
             // Get Cost
-            double cost = calculateCost(aLayer2, classifcationSet[i]);
+            double cost = calculateCost(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
 
             // Backwards Propigation through Layer 2
-            double[] gradiantBiasLayer2 = backwardPorpigationLayer2(aLayer2, classifcationSet[i]);
+            double[] gradiantBiasLayer2 = backwardPorpigationLayer2(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
             //System.out.println("GradiantBias layer 2: " + Arrays.toString(gradiantBiasLayer2));
             double[][] weightGradientLayer2 = calculateWeightGradient(aLayer1, gradiantBiasLayer2);
 
             // Backwards Propigation through Layer 1
             double[] gradiantBiasLayer1 = backwardPorpigationLayer1(weightLayer2, gradiantBiasLayer2, aLayer1);
             //System.out.println("GradientBias layer 1: " + Arrays.toString(gradiantBiasLayer1));
-            double[][] weightGradientLayer1 = calculateWeightGradient(activationLayer0[i], gradiantBiasLayer1);
+            double[][] weightGradientLayer1 = calculateWeightGradient(activationLayer0[(currentBatch * miniBatchSize) + i], gradiantBiasLayer1);
             //System.out.println("Weight Gradient layer 1: " + Arrays.deepToString(weightGradientLayer1));
 
             calculatedWeightsLayer1[i] = weightGradientLayer1;
@@ -189,26 +190,29 @@ class DigitRecognition
 
     public static void main(String args[])
     {
-        // for number of batches in an epoch
-        for (int currentBatch = 0; currentBatch < miniBatchPerEpoch; currentBatch++)
+        for (int currentEpoch = 0; currentEpoch < totalEpochs; currentEpoch++)
         {
-            // TODO: Figure out a way to skip index in activationLayer for which miniBatch you are on
-            trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2);
-                
-            System.out.println("Memory of Weights Layer 1: \n" + Arrays.deepToString(calculatedWeightsLayer1).replaceAll("], ", "],\n") + "\n");
-            System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
-            System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1).replaceAll("], ", "],\n") + "\n");
-            System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2).replaceAll("], ", "],\n") + "\n");
+            // for number of batches in an epoch
+            for (int currentBatch = 0; currentBatch < miniBatchPerEpoch; currentBatch++)
+            {
+                // TODO: Figure out a way to skip index in activationLayer for which miniBatch you are on
+                trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2);
+                    
+                System.out.println("Memory of Weights Layer 1: \n" + Arrays.deepToString(calculatedWeightsLayer1).replaceAll("], ", "],\n") + "\n");
+                System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
+                System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1).replaceAll("], ", "],\n") + "\n");
+                System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2).replaceAll("], ", "],\n") + "\n");
 
-            biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
-            biasLayer2 = reviseBias(calculatedBiasesLayer2, biasLayer2);
-            System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
-            System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
+                biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
+                biasLayer2 = reviseBias(calculatedBiasesLayer2, biasLayer2);
+                System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
+                System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
 
-            weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
-            weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
-            System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
-            System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
+                weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
+                weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
+                System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
+                System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
+            }
         }
     }
 }
