@@ -1,49 +1,71 @@
 import java.lang.Math;
+import java.time.Year;
 import java.util.Arrays;
+import java.util.concurrent.ThreadLocalRandom;
+import java.io.*;
+import java.util.stream.DoubleStream;
 
 /* Desc */
 class DigitRecognition
 {
+    public static int traningSetSize = 60000;
+    public static int activationLayerInputSize = 784;
+    public static int nodesInLayer1 = 30;
+    public static int nodesInLayer2 = 10;
+
+    public static int correct;
+    public static int incorrect;
+
+    // Statistic tracking variables
+    // public static int correctZero;
+    // public static int incorrectZero;
+
+    // public static int correctOne;
+    // public static int incorrectOne;
+
+    // public static int correctTwo;
+    // public static int incorrectTwo;
+
+    // public static int correctThree;
+    // public static int incorrectThree;
+
+    // public static int correctFour;
+    // public static int incorrectFour;
+
+    // public static int correctFive;
+    // public static int incorrectFive;
+
+    // public static int correctSix;
+    // public static int incorrectSix;
+
+    // public static int correctSeven;
+    // public static int incorrectSeven;
+
+    // public static int correctEight;
+    // public static int incorrectEight;
+
+    // public static int correctNine;
+    // public static int incorrectNine;
+
     // Input Layer
-    public static double[][] activationLayer0 = 
-    {
-        {0, 1, 0, 1},
-        {1, 0, 1, 0},
-        {0, 0, 1, 1},
-        {1, 1, 0, 0}
-    };
+    public static double[][] activationLayer0 = new double[traningSetSize][activationLayerInputSize];
 
     // Weights
-    public static double[][] weightLayer1 = 
-    {
-        {-.21, .72, -.25, 1},
-        {-.94, -.41, -.47, .63},
-        {.15, .55, -.49, -.75}
-    };
+    public static double[][] weightLayer1 = new double[nodesInLayer1][activationLayerInputSize];
 
-    public static double[][] weightLayer2 =
-    {
-        {.76, .48, -.73},
-        {.34, .89, -.23}
-    };
+    public static double[][] weightLayer2 = new double[nodesInLayer2][nodesInLayer1];
 
     // Bias
-    public static double[] biasLayer1 = {.1, -.36, -.31};
-    public static double[] biasLayer2 = {.16, -.46,};
+    public static double[] biasLayer1 = new double[nodesInLayer1];
+    public static double[] biasLayer2 = new double[nodesInLayer2];
 
-    // Classification
-    public static double[][] classifcationSet = 
-    {   
-        {0, 1},
-        {1, 0},
-        {0, 1},
-        {1, 0}
-    };
+    // Classifications
+    public static double[][] classifcationSet = new double[traningSetSize][4];
 
-    public static int miniBatchSize = 2;
-    public static int eta = 10;
+    public static int miniBatchSize = 10;
+    public static int eta = 3; // learning rate
     public static int miniBatchPerEpoch = (activationLayer0.length / miniBatchSize);
-    public static int totalEpochs = 6;
+    public static int totalEpochs = 30;
 
     // 3D arrays for storing calculated weights for each run of a minibatch
     public static double[][][] calculatedWeightsLayer1 = new double[miniBatchSize][weightLayer1.length][weightLayer1[0].length];
@@ -54,8 +76,8 @@ class DigitRecognition
 
 
     public static double[] calculateZLayer(double[] activationLayer, double[][] weightLayer, double[] biasLayer) {
-        double[] zLayer = new double[biasLayer.length];       
-        for (int i = 0; i < biasLayer.length; i++) {
+        double[] zLayer = new double[weightLayer.length];       
+        for (int i = 0; i < weightLayer.length; i++) {
             double z = 0;
             for (int j = 0; j < activationLayer.length; j++)
             {
@@ -69,7 +91,7 @@ class DigitRecognition
     public static double[] calculateALayer(double[] zLayer){
         double[] aLayer = new double[zLayer.length];
         for (int i = 0; i < zLayer.length; i++) {
-            aLayer[i] = 1 / (1 + Math.pow(Math.E, -zLayer[i]));
+            aLayer[i] = 1.0 / (1.0 + Math.pow(Math.E, -zLayer[i]));
         }
         return aLayer;
     }
@@ -127,7 +149,7 @@ class DigitRecognition
             {
                 sumBiasGradient += biasGradient[j][i]; 
             }
-            revisedBias[i] = startingBias[i] - (eta/miniBatchSize) * sumBiasGradient;         
+            revisedBias[i] = startingBias[i] - ((double)eta/miniBatchSize) * sumBiasGradient;         
         }
         return revisedBias;
     }
@@ -148,10 +170,30 @@ class DigitRecognition
                     sumWeightGradient += weightGradient[k][j][i]; 
                 }
                 // Once summation has been found from past weights, use formula
-                revisedWeights[j][i] = startingWeights[j][i] - (eta/miniBatchSize) * sumWeightGradient;         
+                revisedWeights[j][i] = startingWeights[j][i] - ((double)eta/miniBatchSize) * sumWeightGradient;         
             }
         }
         return revisedWeights;
+    }
+
+    public static int getMaxArrayElementIndex(double[] array){
+        int max = 0;
+        for (int i = 0; i < array.length; i++){           
+            if (array[i] > array[max]){
+                max = i;
+            }
+        }
+        return max;
+    }
+    public static void compareClassification(double[] output, double[] classification){
+        int maxOutput = getMaxArrayElementIndex(output);
+        int maxClassification = getMaxArrayElementIndex(classification);
+        if (maxOutput == maxClassification){
+            correct++;
+        }
+        else{
+            incorrect++;
+        }
     }
 
     public static void trainNetwork(int miniBatchSize, int currentBatch, int eta, double[][] activationLayer0, double[][] weightLayer1, double[][] weightLayer2, double[] biasLayer1, double[] biasLayer2)
@@ -165,6 +207,8 @@ class DigitRecognition
             // Forward pass through Layer 2
             double[] zLayer2 = calculateZLayer(aLayer1, weightLayer2, biasLayer2);
             double[] aLayer2 = calculateALayer(zLayer2);
+
+            compareClassification(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
 
             // Get Cost
             double cost = calculateCost(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
@@ -188,31 +232,106 @@ class DigitRecognition
         }
     }
 
+    // Now unused, must be 10 nodes in output layer to take the max. Leaving for future exploration of a 4 node output
+    // Takes a String value and maps its 10-digit binary representation into an array.
+    private static double[] stringToBinaryArray(String x){
+        // convert to Integer and turn to Binary... probably a better way than going from string -> int -> string
+        String binary = Integer.toBinaryString(Integer.parseInt(x));
+        // Format to 10-digit Binary number
+        binary = String.format("%4s", binary).replaceAll(" ", "0");
+        // convert String into Array and cast each element to a double... might change to integers in future
+        double[] binaryArray = Arrays.stream(binary.split(""))
+                        .mapToDouble(Double::parseDouble)
+                        .toArray();
+        return binaryArray;
+    }
+
+        // Takes a String value of classifier and converts it to our desired classification output.
+        // Example: digit "5" should be formatted to [0,0,0,0,0,1,0,0,0,0] 
+        private static double[] formatClassifications(String x){
+            // convert to Integer
+            int digit = Integer.parseInt(x);
+            // add the digit number of leading zeros
+            String leadingZeros = new String(new char[digit]).replace("\0", "0");
+            // since we have 10 output nodes, this is 10 minus the leading zeros. Additional subtraction for the classifier digit
+            String trailingZeros = new String(new char[(10-(digit + 1))]).replace("\0", "0");
+            String formattedClassification = leadingZeros + "1" + trailingZeros;
+            // convert from string to double array
+            double[] classificationArray = Arrays.stream(formattedClassification.split(""))
+                                .mapToDouble(Double::parseDouble)
+                                .toArray();
+            return classificationArray;
+        }
+
+    private static void fetchData() {
+        try (BufferedReader br = new BufferedReader(new FileReader("mnist_train.csv"))) {
+            String line;
+            int i = 0;          
+            while ((line = br.readLine()) != null) {
+                String[] values = line.split(",");
+                for (int j = 0; j < values.length; j++) { 
+                    if (j == 0) {
+                        classifcationSet[i] = formatClassifications(values[j]);
+                    }                                
+                }
+                // create new array removing first element and coverting to double          
+                double[] array = Arrays.stream(Arrays.copyOfRange(values, 1, values.length)).mapToDouble(Double::valueOf).toArray();
+                // normalize input between 0 and 1
+                activationLayer0[i] = DoubleStream.of(array).map(p->p/255).toArray();
+                i++;
+            }      
+        }
+        catch(IOException ie){ }
+    }
+
+    public static double[][] randomizeWeights(double[][] weights){
+        for (int i = 0; i < weights.length; i++){
+            weights[i] = ThreadLocalRandom.current().doubles(weights[0].length, -1, 1).toArray();
+        }
+        return weights;
+    }
+
+    public static double[] randomizeBias(double[] bias){
+        return ThreadLocalRandom.current().doubles(bias.length, 0, 1).toArray();
+    }
+
     public static void main(String args[])
     {
+        // initialize network
+        fetchData();
+        weightLayer1 = randomizeWeights(weightLayer1);
+        weightLayer2 = randomizeWeights(weightLayer2);
+        biasLayer1 = randomizeBias(biasLayer1);
+        biasLayer2 = randomizeBias(biasLayer2);
+
         for (int currentEpoch = 0; currentEpoch < totalEpochs; currentEpoch++)
         {
+            correct = 0;
+            incorrect = 0;
+            System.out.println("---===Starting Epoch " + (currentEpoch + 1) + "===---");
             // for number of batches in an epoch
             for (int currentBatch = 0; currentBatch < miniBatchPerEpoch; currentBatch++)
             {
-                // TODO: Figure out a way to skip index in activationLayer for which miniBatch you are on
                 trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2);
                     
-                System.out.println("Memory of Weights Layer 1: \n" + Arrays.deepToString(calculatedWeightsLayer1).replaceAll("], ", "],\n") + "\n");
-                System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
-                System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1).replaceAll("], ", "],\n") + "\n");
-                System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2).replaceAll("], ", "],\n") + "\n");
+                //System.out.println("Memory of Weights Layer 1: \n" + Arrays.deepToString(calculatedWeightsLayer1).replaceAll("], ", "],\n") + "\n");
+                //System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
+                //System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1) + "\n");
+                //System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2) + "\n");
 
                 biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
                 biasLayer2 = reviseBias(calculatedBiasesLayer2, biasLayer2);
-                System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
-                System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
+                //System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
+                //System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
 
                 weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
                 weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
-                System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
-                System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
+                //System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
+                //System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
             }
+            
+            // Print Statistics
+            System.out.println("correct: " + String.valueOf(correct) + "\nincorrect: " + String.valueOf(incorrect) + "\n" + String.valueOf(((double)correct/(correct + incorrect) * 100)) + "% \n");
         }
     }
 }
