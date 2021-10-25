@@ -12,7 +12,8 @@ import java.util.stream.DoubleStream;
 class DigitRecognition
 {
     // Network Parameters
-    public static int traningSetSize = 60000;
+    public static int trainingSetSize = 60000;
+    public static int testingSetSize = 10000;
     public static int activationLayerInputSize = 784;
     public static int nodesInLayer1 = 30;
     public static int nodesInLayer2 = 10;
@@ -20,9 +21,12 @@ class DigitRecognition
     // Statistical Tracking
     public static List<Integer> correctList = new ArrayList<>();
     public static List<Integer> incorrectList = new ArrayList<>();
+    public static List<Integer> incorrectIndexList = new ArrayList<>();
+    public static List<Integer> correctNetworkOuput = new ArrayList<>();
+    public static List<Integer> incorrectNetworkOuput = new ArrayList<>();
 
     // Input Layer
-    public static double[][] activationLayer0 = new double[traningSetSize][activationLayerInputSize];
+    public static double[][] activationLayer0 = new double[trainingSetSize][activationLayerInputSize];
 
     // Weights
     public static double[][] weightLayer1 = new double[nodesInLayer1][activationLayerInputSize];
@@ -33,7 +37,7 @@ class DigitRecognition
     public static double[] biasLayer2 = new double[nodesInLayer2];
 
     // Classifications
-    public static double[][] classifcationSet = new double[traningSetSize][nodesInLayer2];
+    public static double[][] classifcationSet = new double[trainingSetSize][nodesInLayer2];
 
     public static int miniBatchSize = 10;
     public static int eta = 3; // learning rate
@@ -163,19 +167,22 @@ class DigitRecognition
         return max;
     }
 
-    public static void compareClassification(double[] output, double[] classification){
+    public static void compareClassification(double[] output, double[] classification, int currentIndex){
         int maxOutput = getMaxArrayElementIndex(output);
         int maxClassification = getMaxArrayElementIndex(classification);
         // if our indexes match, then the output was correct
         if (maxOutput == maxClassification){
-            correctList.add(maxOutput);
+            correctList.add(maxClassification);
         }
         else{
-            incorrectList.add(maxOutput);
+            incorrectList.add(maxClassification);
+            incorrectIndexList.add(currentIndex);
+            correctNetworkOuput.add(maxClassification);
+            incorrectNetworkOuput.add(maxOutput);            
         }
     }
 
-    public static void trainNetwork(int miniBatchSize, int currentBatch, int eta, double[][] activationLayer0, double[][] weightLayer1, double[][] weightLayer2, double[] biasLayer1, double[] biasLayer2)
+    public static void trainNetwork(int miniBatchSize, int currentBatch, int eta, double[][] activationLayer0, double[][] weightLayer1, double[][] weightLayer2, double[] biasLayer1, double[] biasLayer2, int activationIndex)
     {
         // for each activation in a minibatch
         for (int i = 0; i < miniBatchSize; i++)
@@ -189,7 +196,7 @@ class DigitRecognition
             double[] aLayer2 = calculateALayer(zLayer2);
 
             // Determine if network output matches classification
-            compareClassification(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
+            compareClassification(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i], activationIndex);
 
             // Get Cost
             double cost = calculateCost(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
@@ -241,9 +248,9 @@ class DigitRecognition
             return classificationArray;
         }
 
-    private static void fetchData() {
+    private static void fetchData(String file) {
         // Get data set by csv entered
-        try (BufferedReader br = new BufferedReader(new FileReader("mnist_train.csv"))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
             String line;
             int i = 0;          
             while ((line = br.readLine()) != null) {
@@ -295,6 +302,29 @@ class DigitRecognition
         }
     }
 
+    public static void testNueralNetwork(){
+        // clear statistics from last epoch
+        correctList.clear();
+        incorrectList.clear();
+        // Fetch Test Set
+        fetchData("mnist_test.csv");
+        // Forward pass through Layer 1
+        for (int i = 0; i < activationLayer0.length; i++)
+        {
+            double[] zLayer1 = calculateZLayer(activationLayer0[i], weightLayer1, biasLayer1);
+            double[] aLayer1 = calculateALayer(zLayer1);
+    
+            // Forward pass through Layer 2
+            double[] zLayer2 = calculateZLayer(aLayer1, weightLayer2, biasLayer2);
+            double[] aLayer2 = calculateALayer(zLayer2);
+    
+            // Determine if network output matches classification
+            compareClassification(aLayer2, classifcationSet[i], i);  
+        }
+        // write performance accuracy on test set to console
+        displayStatistics();
+    }
+
     // returns a random array with values between -1 and 1
     public static double[][] randomizeWeights(double[][] weights){
         for (int i = 0; i < weights.length; i++){
@@ -308,7 +338,25 @@ class DigitRecognition
         return ThreadLocalRandom.current().doubles(bias.length, -1, 1).toArray();
     }
 
+    public static void displayStatistics(){
+        // Print Statistics
+        int correctTotal = 0;
+        int completeTotal = 0;
+        for (int i = 0; i < 10; i++)
+        {
+            int correct = Collections.frequency(correctList, i);
+            int total = correct + Collections.frequency(incorrectList, i);
+            correctTotal += correct;
+            completeTotal += total;
+            System.out.print(i + " = " + String.valueOf(correct) + "/" + String.valueOf(total) + "\t");
+        }
+
+        System.out.print("Accuracy = " + String.valueOf(correctTotal) + "/"+ String.valueOf(completeTotal) + " " + String.format("%.2f", ((double)correctTotal / completeTotal) * 100) + "% \n");
+    }
+
     public static void trainNewNueralNetwork(){
+        // index for tracking the activationInput
+        int currentActivation = 0;
 
         // initialize network with random weights and biases
         weightLayer1 = randomizeWeights(weightLayer1);
@@ -316,7 +364,7 @@ class DigitRecognition
         biasLayer1 = randomizeBias(biasLayer1);
         biasLayer2 = randomizeBias(biasLayer2);
         // get the training set for inputs and classifications
-        fetchData();
+        fetchData("mnist_train.csv");
 
         // an Epoch
         for (int currentEpoch = 0; currentEpoch < totalEpochs; currentEpoch++)
@@ -326,11 +374,11 @@ class DigitRecognition
             incorrectList.clear();
 
             System.out.println("\n---===Starting Epoch " + (currentEpoch + 1) + "===---\n");
-            
+
             // a Minibatch
             for (int currentBatch = 0; currentBatch < miniBatchPerEpoch; currentBatch++)
             {
-                trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2);
+                trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2, currentActivation);
                 
                 // revise Bias and Weights after a minibatch
                 biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
@@ -338,21 +386,10 @@ class DigitRecognition
 
                 weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
                 weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
+                currentActivation++;
             }
-            
-            // Print Statistics
-            int correctTotal = 0;
-            int completeTotal = 0;
-            for (int i = 0; i < 10; i++)
-            {
-                int correct = Collections.frequency(correctList, i);
-                int total = correct + Collections.frequency(incorrectList, i);
-                correctTotal += correct;
-                completeTotal += total;
-                System.out.print(i + " = " + String.valueOf(correct) + "/" + String.valueOf(total) + "\t");
-            }
-
-            System.out.print("Accuracy = " + String.valueOf(correctTotal) + "/"+ String.valueOf(completeTotal) + " " + String.format("%.2f", ((double)correctTotal / completeTotal) * 100) + "% \n");
+            // Write the statistics for each epoch
+            displayStatistics();       
         }
     }
 
@@ -390,45 +427,93 @@ class DigitRecognition
         br.close();
     }
 
-    public static void printMainMenu(){
-        System.out.println("[0] Train New Nueral Network");
-        System.out.println("[1] Save Nueral Network");
-        System.out.println("[2] Load Existing Nueral Network");
-        System.out.println("[99] Exit Application\n");
-        System.out.println("Please Enter Your Selection..  ");
+    public static void digitToAscii(double[] input){
+        // adapted logic from jonathan petitcolas article on converting image to ascii art
+        String grayRamp = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~<>i!lI;:,`. ";
+        String[] grayRampArray = grayRamp.split("");
+        int rampLength = grayRamp.length();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < input.length; i++)
+        {
+            if ( i % 28 == 0){
+                sb.append("\n");
+            }
+            sb.append(grayRampArray[(int)((rampLength - 1) * input[i])]);
+        }
+        System.out.println(sb.toString() + "\n");
     }
 
-    public static int getUserSelection(){
+    public static void displayDigit(List<Integer> inputIndex, List<Integer> networkClassification, List<Integer> correctClassification) {
+        for (int i = 0; i < inputIndex.size(); i++) {
+            System.out.println("\nInput #" + inputIndex.get(i));
+            System.out.println("Correct Classification: " + correctClassification.get(i));
+            System.out.println("Network Classification: " + networkClassification.get(i));
+            digitToAscii(activationLayer0[inputIndex.get(i)]);
+            System.out.println("To see the Next Classification Error press [1], all other inputs bring you back to main menu..");
+
+            String userInput = getUserSelection();
+            if (!userInput.equals("1")){
+                break;
+            }          
+        }
+    }
+
+    public static void printMainMenu(){
+        System.out.println("\nDigit Recognition Nueral Network Menu Options");
+        System.out.println("=============================================");
+        System.out.println("  [0] Train New Nueral Network");
+        System.out.println("  [1] Save Nueral Network");
+        System.out.println("  [2] Load Existing Nueral Network");
+        System.out.println("  [3] Test Nueral Network");
+        System.out.println("  [4] Display Missed Classifications");
+        System.out.println("  [9] Exit Application");
+        System.out.println("=============================================\n");
+        System.out.println("Please Enter Your Selection..  \n");
+    }
+
+    public static String getUserSelection(){
         Scanner scanner = new Scanner(System.in);
-        int input = scanner.nextInt();
+        String input = scanner.next();
         return input;
     }
 
     public static void main(String args[]) throws IOException
     {
-        int userInput = -1;
+        String userInput = "";
         // print Menu options to console
         printMainMenu();
         // respond according to selection
-        while(userInput != 99){
+        while(!userInput.equals("9")){
             userInput = getUserSelection();
             switch (userInput){
-                case 0: System.out.println("Training The Nueral Network\n");
+                case "0": System.out.println("\nTraining The Nueral Network\n");
+                        activationLayer0 = new double[trainingSetSize][activationLayerInputSize];
+                        classifcationSet = new double[trainingSetSize][nodesInLayer2];
                         trainNewNueralNetwork();
                         break;
 
-                case 1: System.out.println("Saving The Nueral Network\n");
+                case "1": System.out.println("\nSaving The Nueral Network\n");
                         saveNueralNetwork();
                         break;
-                case 2: System.out.println("Loading a Pretrained Nueral Network\n");
+                case "2": System.out.println("\nLoading a Pretrained Nueral Network\n");
                         loadNueralNetwork();
                         break;
-                case 99: System.out.println("Exiting Application\n");
+                case "3": System.out.println("\nTesting The Network on the Testing Set\n");
+                        activationLayer0 = new double[testingSetSize][activationLayerInputSize];
+                        classifcationSet = new double[testingSetSize][nodesInLayer2];
+                        testNueralNetwork();
                         break;
-                default: System.out.println("Please choose one of the menu options\n");
+                case "4": System.out.println("\nDisplaying Incorrect Classifications\n");
+                        displayDigit(incorrectIndexList, incorrectNetworkOuput, correctNetworkOuput);
+                        break;
+                case "9": System.out.println("\nExiting Application\n");
+                        break;
+                default: System.out.println("\nPlease choose one of the menu options\n");
                 break;
             }
-            printMainMenu();
+            if (!userInput.equals("9")) {
+                printMainMenu();
+            }
         }        
     }
 }
