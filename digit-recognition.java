@@ -1,6 +1,9 @@
 import java.lang.Math;
-import java.time.Year;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Scanner;
 import java.util.concurrent.ThreadLocalRandom;
 import java.io.*;
 import java.util.stream.DoubleStream;
@@ -8,51 +11,21 @@ import java.util.stream.DoubleStream;
 /* Desc */
 class DigitRecognition
 {
+    // Network Parameters
     public static int traningSetSize = 60000;
     public static int activationLayerInputSize = 784;
     public static int nodesInLayer1 = 30;
     public static int nodesInLayer2 = 10;
 
-    public static int correct;
-    public static int incorrect;
-
-    // Statistic tracking variables
-    // public static int correctZero;
-    // public static int incorrectZero;
-
-    // public static int correctOne;
-    // public static int incorrectOne;
-
-    // public static int correctTwo;
-    // public static int incorrectTwo;
-
-    // public static int correctThree;
-    // public static int incorrectThree;
-
-    // public static int correctFour;
-    // public static int incorrectFour;
-
-    // public static int correctFive;
-    // public static int incorrectFive;
-
-    // public static int correctSix;
-    // public static int incorrectSix;
-
-    // public static int correctSeven;
-    // public static int incorrectSeven;
-
-    // public static int correctEight;
-    // public static int incorrectEight;
-
-    // public static int correctNine;
-    // public static int incorrectNine;
+    // Statistical Tracking
+    public static List<Integer> correctList = new ArrayList<>();
+    public static List<Integer> incorrectList = new ArrayList<>();
 
     // Input Layer
     public static double[][] activationLayer0 = new double[traningSetSize][activationLayerInputSize];
 
     // Weights
     public static double[][] weightLayer1 = new double[nodesInLayer1][activationLayerInputSize];
-
     public static double[][] weightLayer2 = new double[nodesInLayer2][nodesInLayer1];
 
     // Bias
@@ -60,7 +33,7 @@ class DigitRecognition
     public static double[] biasLayer2 = new double[nodesInLayer2];
 
     // Classifications
-    public static double[][] classifcationSet = new double[traningSetSize][4];
+    public static double[][] classifcationSet = new double[traningSetSize][nodesInLayer2];
 
     public static int miniBatchSize = 10;
     public static int eta = 3; // learning rate
@@ -70,11 +43,10 @@ class DigitRecognition
     // 3D arrays for storing calculated weights for each run of a minibatch
     public static double[][][] calculatedWeightsLayer1 = new double[miniBatchSize][weightLayer1.length][weightLayer1[0].length];
     public static double[][][] calculatedWeightsLayer2 = new double[miniBatchSize][weightLayer2.length][weightLayer2[0].length];
-    // 3D arrays for storing calculated bias for each run of a minibatch
+    // 2D arrays for storing calculated bias for each run of a minibatch
     public static double[][] calculatedBiasesLayer1 = new double[miniBatchSize][biasLayer1.length];
     public static double[][] calculatedBiasesLayer2 = new double[miniBatchSize][biasLayer2.length];
-
-
+ 
     public static double[] calculateZLayer(double[] activationLayer, double[][] weightLayer, double[] biasLayer) {
         double[] zLayer = new double[weightLayer.length];       
         for (int i = 0; i < weightLayer.length; i++) {
@@ -90,12 +62,14 @@ class DigitRecognition
 
     public static double[] calculateALayer(double[] zLayer){
         double[] aLayer = new double[zLayer.length];
-        for (int i = 0; i < zLayer.length; i++) {
+        for (int i = 0; i < zLayer.length; i++)
+        {
             aLayer[i] = 1.0 / (1.0 + Math.pow(Math.E, -zLayer[i]));
         }
         return aLayer;
     }
 
+    // unused in network training, judges how inaccurate the network was
     public static double calculateCost(double[] aLayer, double[] classifications)
     {
         return (.5) * ((Math.pow((classifications[0] - aLayer[0]), 2)) + (Math.pow((classifications[1] - aLayer[1]), 2)));
@@ -138,6 +112,7 @@ class DigitRecognition
         return weightGradient;
     }
 
+    // uses the stored biases to calculate the new bias
     public static double[] reviseBias(double[][] biasGradient, double[] startingBias)
     {
         double[] revisedBias = new double[startingBias.length];       
@@ -145,6 +120,7 @@ class DigitRecognition
         for (int i = 0; i < startingBias.length; i++)
         {
             double sumBiasGradient = 0;
+            // sum the biases for each run in the minibatch
             for (int j = 0; j < biasGradient.length; j++)
             {
                 sumBiasGradient += biasGradient[j][i]; 
@@ -176,6 +152,7 @@ class DigitRecognition
         return revisedWeights;
     }
 
+    // returns the index of the largest element in an array
     public static int getMaxArrayElementIndex(double[] array){
         int max = 0;
         for (int i = 0; i < array.length; i++){           
@@ -185,19 +162,22 @@ class DigitRecognition
         }
         return max;
     }
+
     public static void compareClassification(double[] output, double[] classification){
         int maxOutput = getMaxArrayElementIndex(output);
         int maxClassification = getMaxArrayElementIndex(classification);
+        // if our indexes match, then the output was correct
         if (maxOutput == maxClassification){
-            correct++;
+            correctList.add(maxOutput);
         }
         else{
-            incorrect++;
+            incorrectList.add(maxOutput);
         }
     }
 
     public static void trainNetwork(int miniBatchSize, int currentBatch, int eta, double[][] activationLayer0, double[][] weightLayer1, double[][] weightLayer2, double[] biasLayer1, double[] biasLayer2)
     {
+        // for each activation in a minibatch
         for (int i = 0; i < miniBatchSize; i++)
         {              
             // Forward pass through Layer 1
@@ -208,6 +188,7 @@ class DigitRecognition
             double[] zLayer2 = calculateZLayer(aLayer1, weightLayer2, biasLayer2);
             double[] aLayer2 = calculateALayer(zLayer2);
 
+            // Determine if network output matches classification
             compareClassification(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
 
             // Get Cost
@@ -215,14 +196,11 @@ class DigitRecognition
 
             // Backwards Propigation through Layer 2
             double[] gradiantBiasLayer2 = backwardPorpigationLayer2(aLayer2, classifcationSet[(currentBatch * miniBatchSize) + i]);
-            //System.out.println("GradiantBias layer 2: " + Arrays.toString(gradiantBiasLayer2));
             double[][] weightGradientLayer2 = calculateWeightGradient(aLayer1, gradiantBiasLayer2);
 
             // Backwards Propigation through Layer 1
             double[] gradiantBiasLayer1 = backwardPorpigationLayer1(weightLayer2, gradiantBiasLayer2, aLayer1);
-            //System.out.println("GradientBias layer 1: " + Arrays.toString(gradiantBiasLayer1));
             double[][] weightGradientLayer1 = calculateWeightGradient(activationLayer0[(currentBatch * miniBatchSize) + i], gradiantBiasLayer1);
-            //System.out.println("Weight Gradient layer 1: " + Arrays.deepToString(weightGradientLayer1));
 
             calculatedWeightsLayer1[i] = weightGradientLayer1;
             calculatedWeightsLayer2[i] = weightGradientLayer2;
@@ -264,13 +242,16 @@ class DigitRecognition
         }
 
     private static void fetchData() {
+        // Get data set by csv entered
         try (BufferedReader br = new BufferedReader(new FileReader("mnist_train.csv"))) {
             String line;
             int i = 0;          
             while ((line = br.readLine()) != null) {
                 String[] values = line.split(",");
                 for (int j = 0; j < values.length; j++) { 
+                    // first element in the line is our classification
                     if (j == 0) {
+                        // format digit into an an array
                         classifcationSet[i] = formatClassifications(values[j]);
                     }                                
                 }
@@ -284,6 +265,37 @@ class DigitRecognition
         catch(IOException ie){ }
     }
 
+    // This is as a dynamic an approach as I could come up with... Expects a csv file with the propper format.
+    // Since the weights are 2D-Arrays, it must keep track of the the current CSV row and subtract to begin inserting at 0
+    private static void loadNueralNetwork() throws IOException {
+        // Get data set by csv entered
+        try (BufferedReader br = new BufferedReader(new FileReader("pretrained.csv"))) {
+            String line;
+            int csvRow = 0;          
+            while ((line = br.readLine()) != null) {
+                // creates an array from a line in the csv file
+                String[] values = line.split(",");
+                // for this section, csvRow should align exactly with index
+                if (csvRow < weightLayer1.length) {
+                    weightLayer1[csvRow] = Arrays.stream(values).mapToDouble(Double::valueOf).toArray();
+                }
+                // subtract out the previous csvRow count to "reset" index to 0
+                else if (csvRow < weightLayer1.length + weightLayer2.length ) {
+                    weightLayer2[csvRow - weightLayer1.length] = Arrays.stream(values).mapToDouble(Double::valueOf).toArray();
+                }
+                // + 1 since the biasLayer is a 1D array
+                else if (csvRow < weightLayer1.length + weightLayer2.length + 1) {
+                    biasLayer1 = Arrays.stream(values).mapToDouble(Double::valueOf).toArray();
+                }
+                else {
+                    biasLayer2 = Arrays.stream(values).mapToDouble(Double::valueOf).toArray();
+                }
+                csvRow++;                                
+            }      
+        }
+    }
+
+    // returns a random array with values between -1 and 1
     public static double[][] randomizeWeights(double[][] weights){
         for (int i = 0; i < weights.length; i++){
             weights[i] = ThreadLocalRandom.current().doubles(weights[0].length, -1, 1).toArray();
@@ -291,47 +303,132 @@ class DigitRecognition
         return weights;
     }
 
+    // returns a random double between -1 and 1
     public static double[] randomizeBias(double[] bias){
-        return ThreadLocalRandom.current().doubles(bias.length, 0, 1).toArray();
+        return ThreadLocalRandom.current().doubles(bias.length, -1, 1).toArray();
     }
 
-    public static void main(String args[])
-    {
-        // initialize network
-        fetchData();
+    public static void trainNewNueralNetwork(){
+
+        // initialize network with random weights and biases
         weightLayer1 = randomizeWeights(weightLayer1);
         weightLayer2 = randomizeWeights(weightLayer2);
         biasLayer1 = randomizeBias(biasLayer1);
         biasLayer2 = randomizeBias(biasLayer2);
+        // get the training set for inputs and classifications
+        fetchData();
 
+        // an Epoch
         for (int currentEpoch = 0; currentEpoch < totalEpochs; currentEpoch++)
         {
-            correct = 0;
-            incorrect = 0;
-            System.out.println("---===Starting Epoch " + (currentEpoch + 1) + "===---");
-            // for number of batches in an epoch
+            // clear statistics from last epoch
+            correctList.clear();
+            incorrectList.clear();
+
+            System.out.println("\n---===Starting Epoch " + (currentEpoch + 1) + "===---\n");
+            
+            // a Minibatch
             for (int currentBatch = 0; currentBatch < miniBatchPerEpoch; currentBatch++)
             {
                 trainNetwork(miniBatchSize, currentBatch, eta, activationLayer0, weightLayer1, weightLayer2, biasLayer1, biasLayer2);
-                    
-                //System.out.println("Memory of Weights Layer 1: \n" + Arrays.deepToString(calculatedWeightsLayer1).replaceAll("], ", "],\n") + "\n");
-                //System.out.println("Memory of Weights Layer 2: \n" + Arrays.deepToString(calculatedWeightsLayer2).replaceAll("], ", "],\n") + "\n");
-                //System.out.println("Memory of Bias Layer 1: \n" + Arrays.deepToString(calculatedBiasesLayer1) + "\n");
-                //System.out.println("Memory of Bias Layer 2: \n" + Arrays.deepToString(calculatedBiasesLayer2) + "\n");
-
+                
+                // revise Bias and Weights after a minibatch
                 biasLayer1 = reviseBias(calculatedBiasesLayer1, biasLayer1);
                 biasLayer2 = reviseBias(calculatedBiasesLayer2, biasLayer2);
-                //System.out.println("Updated Bias Layer 1: \n" + Arrays.toString(biasLayer1) + "\n");
-                //System.out.println("Updated Bias Layer 2: \n" + Arrays.toString(biasLayer2) + "\n");
 
                 weightLayer1 = reviseWeights(calculatedWeightsLayer1, weightLayer1);
                 weightLayer2 = reviseWeights(calculatedWeightsLayer2, weightLayer2);
-                //System.out.println("Updated Weight Layer 1: \n" + Arrays.deepToString(weightLayer1).replaceAll("], ", "],\n") + "\n");
-                //System.out.println("Updated Weight Layer 2: \n" + Arrays.deepToString(weightLayer2).replaceAll("], ", "],\n") + "\n");
             }
             
             // Print Statistics
-            System.out.println("correct: " + String.valueOf(correct) + "\nincorrect: " + String.valueOf(incorrect) + "\n" + String.valueOf(((double)correct/(correct + incorrect) * 100)) + "% \n");
+            int correctTotal = 0;
+            int completeTotal = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                int correct = Collections.frequency(correctList, i);
+                int total = correct + Collections.frequency(incorrectList, i);
+                correctTotal += correct;
+                completeTotal += total;
+                System.out.print(i + " = " + String.valueOf(correct) + "/" + String.valueOf(total) + "\t");
+            }
+
+            System.out.print("Accuracy = " + String.valueOf(correctTotal) + "/"+ String.valueOf(completeTotal) + " " + String.format("%.2f", ((double)correctTotal / completeTotal) * 100) + "% \n");
         }
+    }
+
+    public static void saveNueralNetwork() throws IOException {
+        BufferedWriter br = new BufferedWriter(new FileWriter("pretrained.csv"));
+        StringBuilder sb = new StringBuilder();
+
+        for (double[] array : weightLayer1) {
+            for (double element : array) {
+                sb.append(element);
+                sb.append(",");
+            }
+            sb.append("\n");
+        }
+
+        for (double[] array : weightLayer2) {
+            for (double element : array) {
+                sb.append(element);
+                sb.append(",");
+            }
+            sb.append("\n");
+        }
+
+        for (double element : biasLayer1) {
+            sb.append(element);
+            sb.append(",");
+        }
+        sb.append("\n");
+
+        for (double element : biasLayer2) {
+            sb.append(element);
+            sb.append(",");
+        }
+        br.write(sb.toString());
+        br.close();
+    }
+
+    public static void printMainMenu(){
+        System.out.println("[0] Train New Nueral Network");
+        System.out.println("[1] Save Nueral Network");
+        System.out.println("[2] Load Existing Nueral Network");
+        System.out.println("[99] Exit Application\n");
+        System.out.println("Please Enter Your Selection..  ");
+    }
+
+    public static int getUserSelection(){
+        Scanner scanner = new Scanner(System.in);
+        int input = scanner.nextInt();
+        return input;
+    }
+
+    public static void main(String args[]) throws IOException
+    {
+        int userInput = -1;
+        // print Menu options to console
+        printMainMenu();
+        // respond according to selection
+        while(userInput != 99){
+            userInput = getUserSelection();
+            switch (userInput){
+                case 0: System.out.println("Training The Nueral Network\n");
+                        trainNewNueralNetwork();
+                        break;
+
+                case 1: System.out.println("Saving The Nueral Network\n");
+                        saveNueralNetwork();
+                        break;
+                case 2: System.out.println("Loading a Pretrained Nueral Network\n");
+                        loadNueralNetwork();
+                        break;
+                case 99: System.out.println("Exiting Application\n");
+                        break;
+                default: System.out.println("Please choose one of the menu options\n");
+                break;
+            }
+            printMainMenu();
+        }        
     }
 }
