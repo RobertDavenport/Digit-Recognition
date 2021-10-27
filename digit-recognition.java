@@ -34,12 +34,15 @@ class DigitRecognition
         int activationIndex;
         boolean isCorrect;
 
+        // Constructor
         public Statistic(boolean isCorrect, int networkOutput, int correctOutput, int activationIndex){
             this.isCorrect = isCorrect;
             this.networkOutput = networkOutput;
             this.correctOutput = correctOutput;
             this.activationIndex = activationIndex;
         }
+
+        // Getter
         public int getCorrectOutput() {
             return correctOutput;
           }
@@ -74,6 +77,7 @@ class DigitRecognition
     public static double[][] calculatedBiasesLayer1 = new double[miniBatchSize][biasLayer1.length];
     public static double[][] calculatedBiasesLayer2 = new double[miniBatchSize][biasLayer2.length];
  
+    // Calculates Z Layer, Matrix Mulltiplication([weights] * [aLayer]) + Bias Layer
     public static double[] calculateZLayer(double[] activationLayer, double[][] weightLayer, double[] biasLayer) {
         double[] zLayer = new double[weightLayer.length];       
         for (int i = 0; i < weightLayer.length; i++) {
@@ -87,6 +91,8 @@ class DigitRecognition
         return zLayer;
     }
 
+    // aLayer is calculated using a sigmoidal function
+    // aLayer[i] = sigmoid(zLayer[i])
     public static double[] calculateALayer(double[] zLayer){
         double[] aLayer = new double[zLayer.length];
         for (int i = 0; i < zLayer.length; i++)
@@ -102,6 +108,8 @@ class DigitRecognition
         return (.5) * ((Math.pow((classifications[0] - aLayer[0]), 2)) + (Math.pow((classifications[1] - aLayer[1]), 2)));
     }
 
+    // Backward Propagation through intermediate layer to calculate new bias for Gradient
+    // Matrix Multiplicaton of Weights and Bias Gradient * a[i] * (1-a[i])
     public static double[] backwardPorpigationLayer1(double[][] weights, double[] gradientBias, double[] aLayer)
     {
         double[] gradientbias = new double[aLayer.length];
@@ -117,6 +125,8 @@ class DigitRecognition
         return gradientbias;
     }
 
+    // Backward Propagation through final layer for Gradient Bias
+    // (a[i] - correct Classification) * a[i] * (1 - a[i])
     public static double[] backwardPorpigationLayer2(double[] aLayer, double[] classifications)
     {
         double[] gradientbias = new double[aLayer.length];
@@ -126,8 +136,11 @@ class DigitRecognition
         return gradientbias;
     }
 
+    // Backward Propagation to add another set of weights to the gradient
+    // a[j] * Bias Gradient[i]
     public static double[][] calculateWeightGradient(double[] aLayer, double[] gradientBias)
     {
+
         double[][] weightGradient = new double[gradientBias.length][aLayer.length];
         for (int i = 0; i < gradientBias.length; i++)
         {
@@ -152,8 +165,10 @@ class DigitRecognition
             {
                 sumBiasGradient += biasGradient[j][i]; 
             }
+            // revise based on the old biases plus our learning rate * sum of gradient
             revisedBias[i] = startingBias[i] - ((double)eta/miniBatchSize) * sumBiasGradient;         
         }
+        // the updated Biases
         return revisedBias;
     }
 
@@ -523,6 +538,7 @@ class DigitRecognition
 
             System.out.println("To see the Next Classification Error press [1], all other inputs bring you back to the menu..");
 
+            // continue until user presses anything but 1
             String userInput = getUserSelection();
             if (!userInput.equals("1")){
                 break;
@@ -542,7 +558,7 @@ class DigitRecognition
     }
 
     public static void printSubMenu(){
-        System.out.println("\nDigit Recognition Nueral Advanced Options");
+        System.out.println("\nDigit Recognition Nueral Network Advanced Options");
         System.out.println("=============================================");
         System.out.println("  [0] Save Nueral Network");
         System.out.println("  [1] Test Nueral Network On Training Set");
@@ -580,6 +596,7 @@ class DigitRecognition
                 case "0": 
                     System.out.println("\nSaving The Nueral Network\n");
                     saveNueralNetwork();
+                    // remain on this menu
                     subMenu();
                     break;
                 case "1": 
@@ -588,6 +605,7 @@ class DigitRecognition
                     activationLayer0 = new double[trainingSetSize][activationLayerInputSize];
                     classifcationSet = new double[trainingSetSize][nodesInLayer2];
                     testNueralNetwork("mnist_train.csv");
+                    // move to visualization menu
                     visualizationMenu();
                     break;
                 case "2": 
@@ -596,6 +614,7 @@ class DigitRecognition
                     activationLayer0 = new double[testingSetSize][activationLayerInputSize];
                     classifcationSet = new double[testingSetSize][nodesInLayer2];
                     testNueralNetwork("mnist_test.csv");
+                    // move to visualization menu
                     visualizationMenu();
                     break;
                 case "9": 
@@ -612,6 +631,7 @@ class DigitRecognition
     }
 
     // sub menu, can only be reached after testing the network
+    // has options for displaying the Network Classifications
     public static void visualizationMenu() throws IOException{
         printVisualizerMenu();
         String userInput = "";
